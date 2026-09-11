@@ -238,17 +238,34 @@ async function loadDownloadedList() {
         if (!stories.length) { storyListEl.innerHTML = '<div class="no-results" style="grid-column:1/-1">暂无下载记录</div>'; historyPaginationEl.innerHTML = ''; return; }
         var html = '';
         stories.forEach(function (s) {
-            html += '<div class="story-card"><img class="cover" src="' + (s.cover || '') + '" onerror="this.style.display=\'none\'"><div class="story-info"><div class="story-name">' + esc(s.name) + '</div><div class="story-meta">第 ' + (s.episode || '?') + ' 集' + (s.updated_at ? ' · ' + new Date(s.updated_at).toLocaleDateString() : '') + '</div><div class="history-actions"><button class="history-preview" data-file="' + esc(s.filename || '') + '" data-title="' + esc(s.name) + '">预览</button><button class="history-delete" data-file="' + esc(s.filename || '') + '" data-title="' + esc(s.name) + '">删除</button></div></div></div>';
+            var fileUrl = '/api/download/file?filename=' + encodeURIComponent(s.filename || '');
+            html += '<div class="story-card"><button class="history-cover" data-file="' + esc(s.filename || '') + '" data-title="' + esc(s.name) + '" aria-label="预览 ' + esc(s.name) + '"><img class="cover" src="' + (s.cover || '') + '" onerror="this.style.display=\'none\'"><span class="cover-play">▶</span></button><div class="story-name">' + esc(s.name) + '</div><div class="story-meta">第 ' + (s.episode || '?') + ' 集' + (s.updated_at ? ' · ' + new Date(s.updated_at).toLocaleDateString() : '') + '</div><div class="history-more-wrap"><button class="history-more" aria-label="更多操作" aria-expanded="false">•••</button><div class="history-menu"><a class="history-save" href="' + fileUrl + '" download="' + esc(s.filename || 'video.mp4') + '">下载到本地</a><button class="history-delete" data-file="' + esc(s.filename || '') + '" data-title="' + esc(s.name) + '">删除</button></div></div></div>';
         });
         storyListEl.innerHTML = html;
-        storyListEl.querySelectorAll('.history-preview').forEach(function (button) {
+        storyListEl.querySelectorAll('.history-cover').forEach(function (button) {
             button.addEventListener('click', function () { previewHistory(button.dataset.file, button.dataset.title); });
         });
         storyListEl.querySelectorAll('.history-delete').forEach(function (button) {
             button.addEventListener('click', function () { deleteHistory(button.dataset.file, button.dataset.title); });
         });
+        storyListEl.querySelectorAll('.history-more').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                var menu = button.nextElementSibling;
+                var open = menu.classList.toggle('is-open');
+                button.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+        });
+        document.addEventListener('click', closeHistoryMenus);
         renderHistoryPagination(d.page || historyPage, d.total_pages || 1);
     } catch (e) {}
+}
+function closeHistoryMenus() {
+    document.querySelectorAll('.history-menu.is-open').forEach(function (menu) {
+        menu.classList.remove('is-open');
+        var button = menu.previousElementSibling;
+        if (button) button.setAttribute('aria-expanded', 'false');
+    });
 }
 function renderHistoryPagination(page, totalPages) {
     if (totalPages <= 1) { historyPaginationEl.innerHTML = ''; return; }
