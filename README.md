@@ -1,110 +1,98 @@
-# 儿童绘本视频搜索下载服务
+# 视频分享下载服务
 
-搜索并下载小红书、YouTube、抖音、快手等平台的绘本相关视频，存入 NAS 指定目录供 Emby 媒体库展示。
+一个基于 FastAPI、Celery 和 Docker 的 NAS 网页下载器，包含绘本视频服务和通用下载器两个独立实例。
+
+## 功能
+
+- 支持小红书、抖音、快手、YouTube 和 X 分享文案
+- 自动提取链接、识别平台、获取标题、简介和封面
+- 支持网页预览、下载队列、实时进度、历史分页和删除
+- 下载完成后校验 MP4，失败或不完整文件不会进入历史
+- `APP_MODE=storybook` 显示绘本模式，`APP_MODE=general` 显示通用模式
+- Docker 使用 host 网络，Celery + Redis 执行异步任务
 
 ## 目录结构
 
-```
+```text
 story-video-search/
-├── docker-compose.yml      # Docker 编排
-├── Dockerfile              # 容器构建
-├── backend/                # Python 后端
-│   ├── main.py             # FastAPI 入口
-│   ├── config.py           # 配置
-│   ├── celery_app.py       # Celery 异步队列
-│   ├── tasks.py            # 下载任务
-│   └── requirements.txt    # Python 依赖
-├── app/                    # 业务逻辑
-│   ├── api/                # API 路由
-│   │   ├── search.py       # 搜索接口
-│   │   ├── download.py     # 下载接口
-│   │   └── tasks.py        # 任务状态接口
-│   ├── core/               # 核心模块
-│   │   └── download_manager.py  # 下载管理器
-│   ├── platforms/          # 各平台实现
-│   │   ├── youtube.py      # YouTube
-│   │   ├── xiaohongshu.py  # 小红书
-│   │   ├── douyin.py       # 抖音
-│   │   └── kuaishou.py     # 快手
-│   └── models/             # 数据模型
-├── frontend/               # 前端页面
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-├── config/                 # 持久化配置
-└── .env.example            # 环境变量示例
+├── app/                  # API、平台适配器和下载管理
+├── backend/              # FastAPI、Celery 和配置
+├── frontend/             # HTML/CSS/JavaScript 页面
+├── docker-compose.yml    # 绘本服务
+└── common-downloader/    # 通用下载器独立副本
 ```
 
-## 下载目录结构
+## NAS 部署
 
-下载的视频会按绘本名称自动创建文件夹：
+绘本服务：
 
-```
-/volume3/media/links/电视剧/儿童剧/儿童绘本/
-├── 大卫不可以/
-│   ├── cover.jpg
-│   ├── metadata.json
-│   ├── youtube_大卫不可以_xxx.mp4
-│   └── xiaohongshu_大卫不可以_xxx.mp4
-├── 好饿的毛毛虫/
-│   └── ...
-└── metadata.json           # 全局索引（供前端展示）
+```text
+项目目录：/volume1/docker/story-video-search
+宿主下载目录：/volume3/media/links/电视剧/儿童/儿童绘本
+内网端口：8000
 ```
 
-## 部署步骤
+通用下载器：
 
-### 1. 克隆项目到 NAS
-
-```bash
-# 在 NAS 上执行
-git clone <本项目地址> /path/to/story-video-search
-cd /path/to/story-video-search
+```text
+项目目录：/volume1/docker/common-downloader
+宿主下载目录：/volume3/9kg/common
+内网端口：8001
+容器名称：common-downloader-web
+Celery 队列：common-downloads
 ```
-
-### 2. 配置环境变量
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填入 YouTube API Key（可选）
+# 至少设置 AUTH_KEY；不要把 .env 提交到 Git
+docker compose up -d --build
+curl http://127.0.0.1:8000/api/health
 ```
 
-### 3. 启动服务
+通用下载器的 `docker-compose.yml` 已使用端口 `8001` 和独立 Celery 队列。Lucky 或其他反代只需将域名转发到 `http://NAS_IP:8001`。
 
-```bash
-docker compose up -d
+## 环境变量
+
+| 变量 | 说明 |
+|---|---|
+| `AUTH_KEY` | 网页访问密钥，必须通过部署环境设置 |
+| `APP_MODE` | `storybook` 或 `general`，控制页面模式和文案 |
+| `DOWNLOAD_BASE_PATH` | 容器内下载根目录，通常为 `/data/downloads` |
+| `REDIS_URL` | Celery Broker/Backend 地址 |
+| `CELERY_QUEUE` | 任务队列名称，多个实例应保持不同 |
+| `DEEPSEEK_API_KEY` | 可选，必须使用环境变量注入 |
+| `QSY_PARSE_API_URL` | 抖音解析服务地址 |
+| `QSY_PARSE_KEY` | 可选的解析服务 Key |
+| `QSY_PARSE_TYPE` | 解析模式，默认 `sd` |
+| `YOUTUBE_API_KEY` | 可选；不设置时使用 yt-dlp |
+
+## Emby 文件结构
+
+绘本服务默认生成电视节目结构：
+
+```text
+儿童绘本/
+├── tvshow.nfo
+└── Season 1/
+    ├── season.nfo
+    └── 儿童绘本 - S01E01 - 作品名.mp4
 ```
 
-### 4. Lucky 反代配置
+## API
 
-在 Lucky 后台添加反向代理规则：
-
-- **服务名称**: 绘本搜索
-- **目标地址**: `http://localhost:8000`
-- **域名**: `story.your-domain.com`
-- **WebSocket 支持**: 开启
-
-### 5. Emby 配置
-
-- Emby 中添加媒体库 → 类型选「其他视频」
-- 路径：`/volume3/media/links/电视剧/儿童剧/儿童绘本/`
-- Emby 会自动识别文件夹和封面
-
-## API 接口
-
-| 接口 | 方法 | 说明 |
+| 方法 | 路径 | 说明 |
 |---|---|---|
-| `/api/search?query=绘本名` | GET | 搜索各平台视频 |
-| `/api/download` | POST | 提交下载任务 |
-| `/api/tasks/{task_id}` | GET | 查询下载进度 |
-| `/api/download/list` | GET | 已下载绘本列表 |
-| `/api/download/path` | GET | 查看下载路径 |
-| `/api/health` | GET | 健康检查 |
+| `GET` | `/api/health` | 健康检查和当前模式 |
+| `GET` | `/api/search?query=绘本名` | 搜索结果 |
+| `POST` | `/api/search/link` | 解析完整分享文案 |
+| `POST` | `/api/download` | 创建异步下载任务 |
+| `GET` | `/api/tasks/{task_id}` | 查询进度和错误 |
+| `GET` | `/api/download/list?page=1&page_size=12` | 分页读取历史 |
+| `GET` | `/api/download/file?filename=...` | 预览 MP4 |
+| `DELETE` | `/api/download/file?filename=...` | 删除视频及 NFO |
 
-## 技术栈
+## 安全与限制
 
-- **后端**: Python FastAPI
-- **前端**: 原生 HTML + CSS + JS
-- **任务队列**: Celery + Redis
-- **下载引擎**: yt-dlp + Playwright (小红书)
-- **部署**: Docker Compose
-- **反代**: Lucky
+- `.env`、Cookie、API Key 和下载媒体不应提交到 Git。
+- 平台解析依赖第三方服务和平台页面结构，接口变化可能影响可用性。
+- 请仅下载自己有权保存和使用的内容，并遵守各平台服务条款。
