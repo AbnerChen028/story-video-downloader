@@ -1,0 +1,18 @@
+services:
+  web:
+    build: .
+    image: common-downloader-web:latest
+    container_name: common-downloader-web
+    restart: unless-stopped
+    network_mode: "host"
+    env_file:
+      - .env
+    volumes:
+      - /volume3/9kg/common:/data/downloads
+      - ./config:/app/config
+    environment:
+      - DOWNLOAD_BASE_PATH=/data/downloads
+      - HOST=0.0.0.0
+      - PORT=8001
+      - CELERY_QUEUE=common-downloads
+      - APP_MODE=general

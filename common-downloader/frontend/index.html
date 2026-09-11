@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>绘本视频下载</title>
+    <link rel="stylesheet" href="style.css?v=20260910-3">
+</head>
+<body>
+    <!-- 密钥验证 -->
+    <div id="authPage" class="auth-page">
+        <div class="auth-card">
+            <div class="auth-icon">🔑</div>
+            <h2 id="authTitle">绘本视频下载</h2>
+            <p class="auth-desc">请输入访问密钥</p>
+            <div class="auth-input-group">
+                <input type="password" id="authKeyInput" placeholder="请输入密钥" autocomplete="off" />
+            </div>
+            <button id="authBtn" class="auth-btn">确 认</button>
+            <div id="authError" class="auth-error"></div>
+        </div>
+    </div>
+
+    <div id="mainApp" class="container" style="display:none;">
+        <header class="app-header">
+            <div class="brand-row">
+                <div class="brand-mark" id="brandMark">绘</div>
+                <div><div class="eyebrow">STORY LIBRARY</div><h1 id="appTitle">儿童绘本</h1></div>
+                <button id="themeToggle" class="icon-btn" title="切换主题" aria-label="切换主题">☾</button>
+            </div>
+            <p class="subtitle" id="appSubtitle">把分享内容粘贴进来，自动识别平台与作品名，整理成 Emby 剧集。</p>
+        </header>
+        <main>
+            <section class="capture-panel">
+                <div class="section-kicker"><span class="step-number">01</span><span>添加绘本视频</span></div>
+                <h2>粘贴分享内容</h2>
+                <p class="panel-copy" id="panelCopy">支持小红书、抖音、快手和 YouTube。整段分享文案也可以直接粘贴。</p>
+                <div class="link-input-row">
+                    <textarea id="linkInput" rows="4" placeholder="在这里粘贴分享文案或链接…"></textarea>
+                    <button id="linkBtn" class="primary-action"><span>识别并下载</span><span aria-hidden="true">↗</span></button>
+                </div>
+                <div class="input-footer"><span class="link-detect-badge" id="detectBadge">等待链接</span><span class="link-hint" id="detectHint">会自动提取文本中的第一个视频链接</span></div>
+            </section>
+            <section id="pendingLinks" class="pending-links" style="display:none;"><div class="section-title">下载队列</div><div id="linkList"></div></section>
+            <div id="loading" class="loading" style="display:none;"><div class="spinner"></div><p>正在识别作品信息…</p></div>
+            <section id="results" class="results-section"></section>
+            <section id="downloadStatus" class="download-status" style="display:none;"><div class="section-title">下载任务</div><div id="taskList"></div></section>
+            <section id="downloadedList" class="downloaded-section"><div class="section-title section-title-row"><span>最近加入</span><span class="section-caption">Season 1</span></div><div id="storyList" class="story-grid"></div><div id="historyPagination" class="history-pagination"></div></section>
+        </main>
+    </div>
+
+    <script src="script.js?v=20260911-x-progress"></script>
+</body>
+</html>
