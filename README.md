@@ -1,4 +1,4 @@
-# Story Video Search
+# Story Video Downloader
 
 面向 NAS 和 Emby 用户的自托管视频下载与整理工具。粘贴分享文案或链接后，服务会识别平台、获取视频元数据、创建异步下载任务，并把完成的视频整理成 Emby 可识别的剧集目录。
 
