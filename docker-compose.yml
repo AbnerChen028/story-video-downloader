@@ -5,11 +5,12 @@ services:
     restart: unless-stopped
     network_mode: "host"
     volumes:
-      - /volume3/media/links/电视剧/儿童/儿童绘本:/data/downloads
+      - ${MEDIA_PATH:-./downloads}:/data/downloads
       - ./config:/app/config
     environment:
       - DOWNLOAD_BASE_PATH=/data/downloads
-      - REDIS_URL=redis://127.0.0.1:6379/0
+      - REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/0}
+      - APP_MODE=${APP_MODE:-storybook}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}

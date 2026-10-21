@@ -1,98 +1,80 @@
-# 视频分享下载服务
+# Story Video Search
 
-一个基于 FastAPI、Celery 和 Docker 的 NAS 网页下载器，包含绘本视频服务和通用下载器两个独立实例。
+面向 NAS 和 Emby 用户的自托管视频下载与整理工具。粘贴分享文案或链接后，服务会识别平台、获取视频元数据、创建异步下载任务，并把完成的视频整理成 Emby 可识别的剧集目录。
+
+A self-hosted video downloader for NAS and Emby users. It extracts links from share text, queues downloads, and writes Emby-compatible metadata.
+
+> 项目阶段：早期版本。目前主要在个人 NAS 环境中使用，平台解析依赖第三方页面和服务，接口变化可能导致暂时失效。
 
 ## 功能
 
-- 支持小红书、抖音、快手、YouTube 和 X 分享文案
-- 自动提取链接、识别平台、获取标题、简介和封面
-- 支持网页预览、下载队列、实时进度、历史分页和删除
-- 下载完成后校验 MP4，失败或不完整文件不会进入历史
-- `APP_MODE=storybook` 显示绘本模式，`APP_MODE=general` 显示通用模式
-- Docker 使用 host 网络，Celery + Redis 执行异步任务
+- 从小红书、抖音、快手、YouTube 和 X 的分享文案中提取链接
+- 识别平台，获取标题、简介和封面
+- 使用 Celery 和 Redis 异步下载，显示任务进度
+- 下载历史分页、视频预览和本地删除
+- 生成 Emby 使用的 `tvshow.nfo`、`season.nfo` 和单集 NFO
+- 通过 `APP_MODE` 提供 `storybook` 和 `general` 两种页面模式
 
-## 目录结构
+## 快速开始
 
-```text
-story-video-search/
-├── app/                  # API、平台适配器和下载管理
-├── backend/              # FastAPI、Celery 和配置
-├── frontend/             # HTML/CSS/JavaScript 页面
-├── docker-compose.yml    # 绘本服务
-└── common-downloader/    # 通用下载器独立副本
-```
-
-## NAS 部署
-
-绘本服务：
-
-```text
-项目目录：/volume1/docker/story-video-search
-宿主下载目录：/volume3/media/links/电视剧/儿童/儿童绘本
-内网端口：8000
-```
-
-通用下载器：
-
-```text
-项目目录：/volume1/docker/common-downloader
-宿主下载目录：/volume3/9kg/common
-内网端口：8001
-容器名称：common-downloader-web
-Celery 队列：common-downloads
-```
+运行环境需要 Docker、Docker Compose、可访问的 Redis，以及一个可写的媒体目录。当前 Compose 配置使用 Linux/NAS 的 host network。
 
 ```bash
 cp .env.example .env
-# 至少设置 AUTH_KEY；不要把 .env 提交到 Git
+# 编辑 .env，至少设置 AUTH_KEY、MEDIA_PATH 和 REDIS_URL
 docker compose up -d --build
 curl http://127.0.0.1:8000/api/health
 ```
 
-通用下载器的 `docker-compose.yml` 已使用端口 `8001` 和独立 Celery 队列。Lucky 或其他反代只需将域名转发到 `http://NAS_IP:8001`。
+访问 `http://NAS_IP:8000`，使用 `.env` 中的 `AUTH_KEY` 登录。
 
-## 环境变量
+## 配置
 
 | 变量 | 说明 |
 |---|---|
-| `AUTH_KEY` | 网页访问密钥，必须通过部署环境设置 |
-| `APP_MODE` | `storybook` 或 `general`，控制页面模式和文案 |
-| `DOWNLOAD_BASE_PATH` | 容器内下载根目录，通常为 `/data/downloads` |
+| `AUTH_KEY` | 网页访问密钥，必须设置为随机值 |
+| `MEDIA_PATH` | 宿主机媒体目录，Compose 会挂载到容器内 |
+| `DOWNLOAD_BASE_PATH` | 容器内下载根目录，默认 `/data/downloads` |
 | `REDIS_URL` | Celery Broker/Backend 地址 |
-| `CELERY_QUEUE` | 任务队列名称，多个实例应保持不同 |
-| `DEEPSEEK_API_KEY` | 可选，必须使用环境变量注入 |
-| `QSY_PARSE_API_URL` | 抖音解析服务地址 |
-| `QSY_PARSE_KEY` | 可选的解析服务 Key |
-| `QSY_PARSE_TYPE` | 解析模式，默认 `sd` |
-| `YOUTUBE_API_KEY` | 可选；不设置时使用 yt-dlp |
+| `APP_MODE` | `storybook` 或 `general` |
+| `YOUTUBE_API_KEY` | 可选；未设置时使用 yt-dlp 搜索 |
+| `DEEPSEEK_API_KEY` | 可选；用于从分享文案提取作品名 |
+| `QSY_PARSE_API_URL` | 可选；抖音解析服务地址 |
+| `QSY_PARSE_KEY` | 可选；解析服务密钥 |
 
-## Emby 文件结构
+不要把 `.env`、Cookie、API Key 或下载后的媒体文件提交到 Git。
 
-绘本服务默认生成电视节目结构：
+## Emby 目录
+
+绘本模式默认生成以下结构：
 
 ```text
 儿童绘本/
 ├── tvshow.nfo
 └── Season 1/
     ├── season.nfo
-    └── 儿童绘本 - S01E01 - 作品名.mp4
+    ├── 儿童绘本 - S01E01 - 作品名.mp4
+    └── 儿童绘本 - S01E01 - 作品名.nfo
 ```
 
-## API
+## 主要接口
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `GET` | `/api/health` | 健康检查和当前模式 |
-| `GET` | `/api/search?query=绘本名` | 搜索结果 |
-| `POST` | `/api/search/link` | 解析完整分享文案 |
-| `POST` | `/api/download` | 创建异步下载任务 |
-| `GET` | `/api/tasks/{task_id}` | 查询进度和错误 |
-| `GET` | `/api/download/list?page=1&page_size=12` | 分页读取历史 |
-| `GET` | `/api/download/file?filename=...` | 预览 MP4 |
-| `DELETE` | `/api/download/file?filename=...` | 删除视频及 NFO |
+| `POST` | `/api/search/link` | 解析分享链接或分享文案 |
+| `POST` | `/api/download` | 创建下载任务 |
+| `GET` | `/api/tasks/{task_id}` | 查询任务进度 |
+| `GET` | `/api/download/list` | 分页读取下载历史 |
+| `GET` | `/api/download/file?filename=...` | 预览视频 |
 
-## 安全与限制
+## 已知限制
 
-- `.env`、Cookie、API Key 和下载媒体不应提交到 Git。
-- 平台解析依赖第三方服务和平台页面结构，接口变化可能影响可用性。
-- 请仅下载自己有权保存和使用的内容，并遵守各平台服务条款。
+- 平台页面、短链接和解析服务变化后，相关适配器可能需要更新。
+- 下载完成检查目前只确认文件存在，尚未做媒体容器级完整性校验。
+- 当前还没有覆盖平台适配器和任务失败分支的自动化测试。
+- 建议部署在可信内网或带身份验证的反向代理后，不要直接暴露到公网。
+
+## License
+
+[MIT](LICENSE)
